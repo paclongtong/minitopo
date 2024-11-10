@@ -375,13 +375,14 @@ class Topo(object):
     CLIENT_NAME_PREFIX = "Client"
     SERVER_NAME_PREFIX = "Server"
     ROUTER_NAME_PREFIX = "Router"
-    CMD_LOG_FILENAME = "command.log"
+    CMD_LOG_FILENAME = "/dev/shm/minitopo_experiences/command.log"
 
     def __init__(self, topo_builder, topo_parameter):
         self.topo_builder = topo_builder
         self.topo_parameter = topo_parameter
         self.change_netem = topo_parameter.get(TopoParameter.CHANGE_NETEM).lower() == "yes"
         self.log_file = open(Topo.CMD_LOG_FILENAME, 'w')
+        self.filenameFull = Topo.CMD_LOG_FILENAME
         self.clients = []
         self.routers = []
         self.servers = []

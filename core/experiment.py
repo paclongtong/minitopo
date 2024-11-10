@@ -112,7 +112,7 @@ class Experiment(object):
     PARAMETER_CLASS = ExperimentParameter
 
     IP_BIN = "ip"
-    PING_OUTPUT = "ping.log"
+    PING_OUTPUT = "/dev/shm/minitopo_experiences/ping.log"
 
     def __init__(self, experiment_parameter_filename, topo, topo_config):
         """
@@ -148,9 +148,11 @@ class Experiment(object):
 
         TODO: split experiment traffic and protocol configuration
         """
-        self.setup_sysctl()
-        self.run_userspace_path_manager()  # TODO to move elsewhere
-        self.put_priority_on_paths()  # TODO to move elsewhere
+
+        # self.setup_sysctl()
+        # self.run_userspace_path_manager()  # TODO to move elsewhere
+        # self.put_priority_on_paths()  # TODO to move elsewhere
+
         self.run_tcpdump()
         self.run_netem_at()
 

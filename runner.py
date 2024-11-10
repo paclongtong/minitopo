@@ -101,6 +101,17 @@ class Runner(object):
 
 
 if __name__ == '__main__':
+    # import subprocess
+
+    # # Add the command that requires sudo
+    # command = ["sudo", "-S", "python3", "script.py", "--arg1", "value1"]
+    # password = "your_password"  # You can read this securely from a file or environment variable
+
+    # # Pass the password via stdin
+    # process = subprocess.Popen(command, stdin=subprocess.PIPE, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+    # output, error = process.communicate(input=password.encode())
+
+    # print(output.decode())
     import argparse
 
     parser = argparse.ArgumentParser(
