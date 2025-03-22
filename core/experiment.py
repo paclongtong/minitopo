@@ -112,7 +112,7 @@ class Experiment(object):
     PARAMETER_CLASS = ExperimentParameter
 
     IP_BIN = "ip"
-    PING_OUTPUT = "/dev/shm/minitopo_experiences/ping.log"
+    PING_OUTPUT = "/tmp/minitopo_experiences/ping.log"
 
     def __init__(self, experiment_parameter_filename, topo, topo_config):
         """

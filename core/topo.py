@@ -375,7 +375,7 @@ class Topo(object):
     CLIENT_NAME_PREFIX = "Client"
     SERVER_NAME_PREFIX = "Server"
     ROUTER_NAME_PREFIX = "Router"
-    CMD_LOG_FILENAME = "/dev/shm/minitopo_experiences/command.log"
+    CMD_LOG_FILENAME = "/tmp/minitopo_experiences/command.log"
 
     def __init__(self, topo_builder, topo_parameter):
         self.topo_builder = topo_builder

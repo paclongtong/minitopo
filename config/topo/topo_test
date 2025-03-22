@@ -1,0 +1,8 @@
+leftSubnet:10.0.
+rightSubnet:10.1.
+topoType:MultiIf
+path_c2r_0:35,15,10,0.0
+path_c2r_1:15,50,20,0.0
+path_c2r_2:10,10,1,0.0
+changeNetem:yes
+_netemAt_1:3,loss 1%

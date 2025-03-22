@@ -1,10 +1,12 @@
 import sys
 import os
-sys.path.append(os.path.abspath("/home/bolong/minitopo"))
+sys.path.append(os.path.abspath("/home/paul/minitopo"))
 from core.experiment import Experiment, ExperimentParameter, RandomFileParameter, RandomFileExperiment
 import logging
 
-
+IPERF_LOG = "/tmp/minitopo_experiences/iperf_client.log"
+IPERF_SERVER_LOG = "/tmp/minitopo_experiences/iperf_server.log"
+IPERF_BIN = "iperf3"
 
 class QuicheParameter(RandomFileParameter):
     SIZE = "quicheSize"
@@ -113,7 +115,7 @@ class QuicheParameter(RandomFileParameter):
             QuicheParameter.MAX_JSON_PAYLOAD: "10000",
             QuicheParameter.CONNECT_TO: "",
             QuicheParameter.TRUST_CA: "",
-            QuicheParameter.CC_ALGORITHM_CLIENT:"cubic",
+            QuicheParameter.CC_ALGORITHM_CLIENT:"bbr",
             QuicheParameter.MAX_ACTIVE_CIDS: "2",
             QuicheParameter.PERFORM_MIGRATION: "false",
             QuicheParameter.SOURCE_PORT: "0",
@@ -121,15 +123,26 @@ class QuicheParameter(RandomFileParameter):
             QuicheParameter.SESSION_FILE: "",
         })
 
-
+# sudo /usr/bin/python /home/paul/minitopo/runner.py -x config/xp/quiche -t config/topo/topo_1
 class Quiche(RandomFileExperiment):
     NAME = "quiche"
     PARAMETER_CLASS = QuicheParameter
 
-    CLIENT = "/home/bolong/quiche-multipath/quiche/apps/src/bin/send_different/quiche-client"
-    SERVER = "/home/bolong/quiche-multipath/quiche/apps/src/bin/send_different/quiche-server"
-    SERVER_LOG = "/dev/shm/minitopo_experiences/quiche_server.log"
-    CLIENT_LOG = "/dev/shm/minitopo_experiences/quiche_client.log"
+    # CLIENT = "/home/paul/multipath-quiche/target/release/separate_stream_ack/quiche-client"
+    # SERVER = "/home/paul/multipath-quiche/target/release/separate_stream_ack/quiche-server"
+
+    # CLIENT = "/home/paul/multipath-quiche/target/release/separate-two-streams/quiche-client"
+    # SERVER = "/home/paul/multipath-quiche/target/release/separate-two-streams/quiche-server"
+    
+    CLIENT = "/home/paul/multipath-quiche/target/release/original-two-streams/quiche-client"
+    SERVER = "/home/paul/multipath-quiche/target/release/original-two-streams/quiche-server"
+
+    # CLIENT = "/home/paul/multipath-quiche/target/release/original/quiche-client"
+    # SERVER = "/home/paul/multipath-quiche/target/release/original/quiche-server"
+    SERVER_LOG = "/tmp/minitopo_experiences/quiche_server.log"
+    CLIENT_LOG = "/tmp/minitopo_experiences/quiche_client.log"
+    
+    PING_OUTPUT = "/tmp/minitopo_experiences/ping.log"
 
     def __init__(self, experiment_parameter_filename, topo, topo_config):
         super(Quiche, self).__init__(experiment_parameter_filename, topo, topo_config)
@@ -209,13 +222,26 @@ class Quiche(RandomFileExperiment):
         self.topo.command_to(self.topo_config.server, "rm {}".format(Quiche.SERVER_LOG))
         self.topo.command_to(self.topo_config.server, "dd if=/dev/random of={}/{} bs=1024 count={}".format(self.root_dir, self.size, int(self.size) // 1024))
 
+    def get_iperf_server_cmd(self):
+        cmd = f"iperf3 -s -p 5201 &> {IPERF_SERVER_LOG} &"
+        self.topo.command_to(self.topo_config.server, cmd)
+    
+    def get_iperf_client_cmd(self):
+        """
+        Generate the iperf client command with variable log file, server IP, test duration, and parallel streams.
+        """
+        cmd = f"iperf3 -c 10.1.0.1 -p 5201" \
+              f"-t 30 -P 4 -i 1 &> {IPERF_LOG}"
+        logging.info(f"Client Command: {cmd}")
+        return cmd
+
     def get_quiche_server_cmd(self):
         """
          Constructs the command for starting the Quiche server using the loaded parameters.
          """
 
         '''
-        certs = "--cert /home/bolong/quiche-multipath/quiche/apps/src/bin/cert.crt --key /home//bolong/quiche-multipath/quiche/apps/src/bin/cert.key --listen 0.0.0.0:4433 --root ."
+        certs = "--cert /home/paul/quiche-multipath/quiche/apps/src/bin/cert.crt --key /home//paul/quiche-multipath/quiche/apps/src/bin/cert.key --listen 0.0.0.0:4433 --root ."
         s = "{} {} {} {} &> {} &".format(self.env, Quiche.SERVER, certs, self.server_flags,
             Quiche.SERVER_LOG)
         logging.info(s)
@@ -297,7 +323,8 @@ class Quiche(RandomFileExperiment):
               f"{idle_timeout} {wire_version} {http_version} {dgram_proto} {dgram_count} {dgram_data} " \
               f"{dump_packets} {dump_responses} {dump_json} {max_json_payload} {connect_to} {trust_ca} {cc_algorithm} " \
               f"{max_active_cids} {perform_migration} {source_port} {session_file} {initial_max_path_id_client} {addr_client} {self.client_flags} "\
-              f"https://{self.topo_config.get_server_ip()}:4433/{self.size} &> {Quiche.CLIENT_LOG} > /dev/null"
+              f"GET:https://{self.topo_config.get_server_ip()}:4433/{self.size} PUT:https://{self.topo_config.get_server_ip()}:4433/{self.size} &> {Quiche.CLIENT_LOG} > /dev/null " \
+            #   f"--method GET https://{self.topo_config.get_server_ip()}:4433/{self.size}"
 
         logging.info(f"Client command: {cmd}")
         return cmd
@@ -308,10 +335,21 @@ class Quiche(RandomFileExperiment):
         logging.info("Cleaning up experiment. Skipping sysctl restoration.")
 
     def run(self):
+        cmd = self.get_iperf_server_cmd()      # start iperf server
+        self.topo.command_to(self.topo_config.server, cmd)
+
+        cmd = self.get_iperf_client_cmd()       # start iperf client 
+        self.topo.command_to(self.topo_config.client, cmd)
+
+        self.topo.command_to(self.topo_config.client, "sleep 30")
+        self.topo.command_to(self.topo_config.server, "pkill iperf")
+
         cmd = self.get_quiche_server_cmd()
         self.topo.command_to(self.topo_config.server, cmd)
 
         self.topo.command_to(self.topo_config.client, "sleep 2")
+
+
 
         cmd = self.get_quiche_client_cmd()
         self.topo.command_to(self.topo_config.client, cmd)

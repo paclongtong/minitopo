@@ -26,7 +26,7 @@ class IPerf(Experiment):
     def __init__(self, experiment_parameter_filename, topo, topo_config):
         super(IPerf, self).__init__(experiment_parameter_filename, topo, topo_config)
         self.load_parameters()
-        self.ping()
+        self.ping() 
 
     def load_parameters(self):
         self.time = self.experiment_parameter.get(IPerfParameter.TIME)

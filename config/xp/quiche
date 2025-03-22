@@ -5,9 +5,9 @@ serverFlags:--disable-gso
 env:RUST_BACKTRACE=full RUST_LOG=trace
 
 quicheSize:1024000
-serverCertPath:/home/bolong/quiche-multipath/quiche/apps/src/bin/cert.crt
-serverKeyPath:/home/bolong/quiche-multipath/quiche/apps/src/bin/cert.key
-serverRootDir:/home/bolong/quiche-multipath/quiche/apps/src/bin/root
+serverCertPath:/home/paul/multipath-quiche/apps/src/bin/cert.crt
+serverKeyPath:/home/paul/multipath-quiche/apps/src/bin/cert.key
+serverRootDir:/home/paul/multipath-quiche/apps/src/bin/root
 serverIndexFile:index.html
 serverName:quic.tech
 serverMaxData:10000000
@@ -15,22 +15,22 @@ serverMaxWindow:25165824
 serverMaxStreamData:1000000
 serverMaxStreamWindow:16700000
 serverMaxStreamsBidi:2
-serverMaxStreamsUni:0
+serverMaxStreamsUni:2
 serverIdleTimeout:30000
 serverCcAlgorithm:cubic
 serverEnableEarlyData:true
 serverEnableRetry:false
 serverDisableGrease:false
-serverHttpVersion:HTTP/0.9
+serverHttpVersion:HTTP/3
 initialMaxPathIdServer:2
 
-clientMethod:GET
+clientMethod:PUT
 clientMaxData:10000000
 clientMaxWindow:25165824
 clientMaxStreamData:1000000
 clientMaxStreamWindow:16700000
 clientMaxStreamsBidi:2
-clientMaxStreamsUni:0
+clientMaxStreamsUni:2
 clientIdleTimeout:30000
 clientWireVersion:babababa
 clientDgramProto:none
