@@ -40,13 +40,16 @@ class LinkCharacteristics(object):
         queuing_delay   the maximum time that a packet can stay in the link buffer (computed over queue_size)
         netem_at        list of NetemAt instances applicable to the link
         backup          integer indicating if this link is a backup one or not (useful for MPTCP)
+        Added uplink_bw and downlink_bw for intra-path asymmetry
     """
-    def __init__(self, id, link_type, delay, queue_size, bandwidth, loss, backup=0):
+    def __init__(self, id, link_type, delay, queue_size, bandwidth, loss, backup=0, uplink_bw=None, downlink_bw=None):
         self.id = id
         self.link_type = link_type
         self.delay = delay
         self.queue_size = queue_size
         self.bandwidth = bandwidth
+        self.uplink_bw = uplink_bw if uplink_bw else bandwidth
+        self.downlink_bw = downlink_bw if downlink_bw else bandwidth
         self.loss = loss
         self.queuing_delay = str(self.extract_queuing_delay(queue_size, bandwidth, delay))
         self.netem_at = []
@@ -84,9 +87,12 @@ class LinkCharacteristics(object):
     def build_delete_tc_cmd(self, ifname):
         return "tc qdisc del dev {} root; tc qdisc del dev {} ingress ".format(ifname, ifname)
 
-    def build_bandwidth_cmd(self, ifname, replace=False):
+    def build_bandwidth_cmd(self, ifname, replace=False, direction='uplink'):
+        # return "tc qdisc {} dev {} root handle 1:0 tbf rate {}mbit burst 15000 limit {}".format(
+        #     "replace" if replace else "add", ifname, self.bandwidth, self.buffer_size())
+        bw = self.uplink_bw if direction == 'uplink' else self.downlink_bw
         return "tc qdisc {} dev {} root handle 1:0 tbf rate {}mbit burst 15000 limit {}".format(
-            "replace" if replace else "add", ifname, self.bandwidth, self.buffer_size())
+            "replace" if replace else "add", ifname, bw, self.buffer_size())
 
     def build_changing_bandwidth_cmd(self, ifname):
         return "&& ".join(
@@ -216,18 +222,24 @@ class TopoParameter(Parameter):
             delay, bandwidth, queue_size, loss_perc, is_backup
         """
         loss_perc, is_backup = 0.0, 0
+        uplink_bw, downlink_bw = None, None
         c = value.split(",")
         if len(c) == 2:
             delay, bw = float(c[0]), float(c[1])
-            return delay, bw, get_bandwidth_delay_product_divided_by_mtu(delay, bw), loss_perc, is_backup
-        if len(c) == 3:
-            return float(c[0]), float(c[2]), int(c[1]), loss_perc, is_backup
-        if len(c) == 4:
-            return float(c[0]), float(c[2]), int(c[1]), float(c[3]), is_backup
-        if len(c) == 5:
-            return float(c[0]), float(c[2]), int(c[1]), float(c[3]), int(c[4])
+        elif len(c) == 3:
+            delay, queue_size, bw = float(c[0]), int(c[1]), float(c[2])
+        elif len(c) == 4:
+            delay, queue_size, bw, loss_perc = float(c[0]), int(c[1]), float(c[2]), float(c[3])
+        elif len(c) == 5:
+            delay, queue_size, bw, loss_perc, is_backup = float(c[0]), int(c[1]), float(c[2]), float(c[3]), int(c[4])
+        elif len(c) == 6:
+            delay, queue_size, bw, loss_perc, uplink_bw, downlink_bw = \
+                float(c[0]), int(c[1]), float(c[2]), float(c[3]), float(c[4]), float(c[5])
+        else:
+            raise ValueError("Invalid link characteristics: {}".format(value))
 
-        raise ValueError("Invalid link characteristics: {}".format(value))
+        queue_size = queue_size if 'queue_size' in locals() else get_bandwidth_delay_product_divided_by_mtu(delay, bw)
+        return delay, bw, queue_size, loss_perc, is_backup, uplink_bw, downlink_bw
 
     def load_link_characteristics(self):
         """
@@ -237,13 +249,16 @@ class TopoParameter(Parameter):
             if k.startswith("path"):
                 try:
                     link_type, link_id = self.parse_link_id_and_type(k)
-                    delay, bw, queue_size, loss_perc, is_backup = self.parse_link_characteristics(
+                    delay, bw, queue_size, loss_perc, is_backup, uplink_bw, downlink_bw = self.parse_link_characteristics(
                         self.parameters[k])
                 except ValueError as e:
                     logging.error("Ignored path {}: {}".format(k, e))
                 else:
+                    # path = LinkCharacteristics(link_id, link_type, delay, queue_size,
+                    #         bw, loss_perc, backup=is_backup)
                     path = LinkCharacteristics(link_id, link_type, delay, queue_size,
-                            bw, loss_perc, backup=is_backup)
+                            bw, loss_perc, backup=is_backup,
+                            uplink_bw=uplink_bw, downlink_bw=downlink_bw)
                     self.link_characteristics.append(path)
 
     def __str__(self):
@@ -295,6 +310,13 @@ class BottleneckLink(object):
         bs1_interface_names = self.topo.get_interface_names(self.bs1)
         bs2_interface_names = self.topo.get_interface_names(self.bs2)
 
+        # Flow bs0 -> bs3 (uplink)
+        shaping_cmd = self.link_characteristics.build_bandwidth_cmd(bs1_interface_names[-1], direction='uplink')
+        self.topo.command_to(self.bs1, shaping_cmd)
+
+        # Flow bs3 -> bs0 (downlink)
+        shaping_cmd = self.link_characteristics.build_bandwidth_cmd(bs2_interface_names[0], direction='downlink')
+        self.topo.command_to(self.bs2, shaping_cmd)
         # Cleanup tc commands
         for bs1_ifname in bs1_interface_names:
             clean_cmd = self.link_characteristics.build_delete_tc_cmd(bs1_ifname)

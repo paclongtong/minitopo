@@ -133,7 +133,7 @@ class Quiche(RandomFileExperiment):
 
     # CLIENT = "/home/paul/multipath-quiche/target/release/separate-two-streams/quiche-client"
     # SERVER = "/home/paul/multipath-quiche/target/release/separate-two-streams/quiche-server"
-    
+
     CLIENT = "/home/paul/multipath-quiche/target/release/original-two-streams/quiche-client"
     SERVER = "/home/paul/multipath-quiche/target/release/original-two-streams/quiche-server"
 
@@ -323,7 +323,9 @@ class Quiche(RandomFileExperiment):
               f"{idle_timeout} {wire_version} {http_version} {dgram_proto} {dgram_count} {dgram_data} " \
               f"{dump_packets} {dump_responses} {dump_json} {max_json_payload} {connect_to} {trust_ca} {cc_algorithm} " \
               f"{max_active_cids} {perform_migration} {source_port} {session_file} {initial_max_path_id_client} {addr_client} {self.client_flags} "\
-              f"GET:https://{self.topo_config.get_server_ip()}:4433/{self.size} PUT:https://{self.topo_config.get_server_ip()}:4433/{self.size} &> {Quiche.CLIENT_LOG} > /dev/null " \
+              f"GET:https://{self.topo_config.get_server_ip()}:4433/{self.size} &> {Quiche.CLIENT_LOG} > /dev/null "
+                # "PUT:https://{self.topo_config.get_server_ip()}:4433/{self.size}"\
+                # " &> {Quiche.CLIENT_LOG} > /dev/null "
             #   f"--method GET https://{self.topo_config.get_server_ip()}:4433/{self.size}"
 
         logging.info(f"Client command: {cmd}")
