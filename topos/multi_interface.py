@@ -120,6 +120,7 @@ class MultiInterfaceConfig(TopoConfig):
 
         for i, _ in enumerate(self.topo.c2r_links):
             cmd = self.interface_up_command(self.get_client_interface(0, i), self.get_client_ip(i), netmask)
+            logging.info(f"cmd to conigure interface {i} (first loop): {cmd}")
             self.topo.command_to(self.client, cmd)
             client_interface_mac = self.client.intf(self.get_client_interface(0, i)).MAC()
             self.topo.command_to(self.router, "arp -s {} {}".format(self.get_client_ip(i), client_interface_mac))
@@ -131,6 +132,7 @@ class MultiInterfaceConfig(TopoConfig):
         for i, _ in enumerate(self.topo.c2r_links):
             cmd = self.interface_up_command(self.get_router_interface_to_client_switch(i),
                     self.get_router_ip_to_client_switch(i), netmask)
+            logging.info(f"cmd to conigure interface {i}: {cmd}")
             self.topo.command_to(self.router, cmd)
             router_interface_mac = self.router.intf(self.get_router_interface_to_client_switch(i)).MAC()
             self.topo.command_to(self.client, "arp -s {} {}".format(

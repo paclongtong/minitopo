@@ -40,16 +40,24 @@ class LinkCharacteristics(object):
         queuing_delay   the maximum time that a packet can stay in the link buffer (computed over queue_size)
         netem_at        list of NetemAt instances applicable to the link
         backup          integer indicating if this link is a backup one or not (useful for MPTCP)
+        
         Added uplink_bw and downlink_bw for intra-path asymmetry
+        Added uplink_delay and downlink_delay for intra-path asymmetry
     """
-    def __init__(self, id, link_type, delay, queue_size, bandwidth, loss, backup=0, uplink_bw=None, downlink_bw=None):
+    def __init__(self, id, link_type, delay, queue_size, bandwidth, loss, backup=0, uplink_bw=None, downlink_bw=None, uplink_delay=None, downlink_delay=None):
         self.id = id
         self.link_type = link_type
         self.delay = delay
         self.queue_size = queue_size
         self.bandwidth = bandwidth
+
         self.uplink_bw = uplink_bw if uplink_bw else bandwidth
         self.downlink_bw = downlink_bw if downlink_bw else bandwidth
+
+        # NEW: Explicit intra-path latency asymmetry
+        self.uplink_delay = uplink_delay if uplink_delay else delay
+        self.downlink_delay = downlink_delay if downlink_delay else delay
+
         self.loss = loss
         self.queuing_delay = str(self.extract_queuing_delay(queue_size, bandwidth, delay))
         self.netem_at = []
@@ -101,9 +109,15 @@ class LinkCharacteristics(object):
             + ["true &"]
         )
 
-    def build_netem_cmd(self, ifname, cmd, replace=False):
-        return "tc qdisc {} dev {} root handle 10: netem {} {}".format(
-            "replace" if replace else "add", ifname, cmd, "delay {}ms limit 50000".format(self.delay) if not replace else "")
+    # def build_netem_cmd(self, ifname, cmd, replace=False):
+    #     return "tc qdisc {} dev {} root handle 10: netem {} {}".format(
+    #         "replace" if replace else "add", ifname, cmd, "delay {}ms limit 50000".format(self.delay) if not replace else "")
+
+    def build_netem_cmd(self, ifname, cmd, replace=False, direction='uplink'):
+        delay = self.uplink_delay if direction == 'uplink' else self.downlink_delay
+        return "tc qdisc {} dev {} root handle 10: netem {} delay {}ms limit 50000".format(
+            "replace" if replace else "add", ifname, cmd, delay)
+
 
     def build_changing_netem_cmd(self, ifname):
         return "&& ".join(
@@ -235,11 +249,16 @@ class TopoParameter(Parameter):
         elif len(c) == 6:
             delay, queue_size, bw, loss_perc, uplink_bw, downlink_bw = \
                 float(c[0]), int(c[1]), float(c[2]), float(c[3]), float(c[4]), float(c[5])
+        elif len(c) == 8:
+            delay, queue_size, bw, loss_perc, uplink_bw, downlink_bw, uplink_delay, downlink_delay = \
+                float(c[0]), int(c[1]), float(c[2]), float(c[3]), float(c[4]), float(c[5]), float(c[6]), float(c[7])
+            # logging.info(f"link characterstics of size 8:\n     delay: {delay}, bw: {bw}, uplink_delay:{uplink_delay}\
+            #              downlink_delay:{downlink_delay}")
         else:
             raise ValueError("Invalid link characteristics: {}".format(value))
 
-        queue_size = queue_size if 'queue_size' in locals() else get_bandwidth_delay_product_divided_by_mtu(delay, bw)
-        return delay, bw, queue_size, loss_perc, is_backup, uplink_bw, downlink_bw
+        queue_size = queue_size if 'queue_size' in locals() else get_bandwidth_delay_product_divided_by_mtu((delay+uplink_delay)/2, bw)
+        return delay, bw, queue_size, loss_perc, is_backup, uplink_bw, downlink_bw, uplink_delay, downlink_delay
 
     def load_link_characteristics(self):
         """
@@ -249,7 +268,7 @@ class TopoParameter(Parameter):
             if k.startswith("path"):
                 try:
                     link_type, link_id = self.parse_link_id_and_type(k)
-                    delay, bw, queue_size, loss_perc, is_backup, uplink_bw, downlink_bw = self.parse_link_characteristics(
+                    delay, bw, queue_size, loss_perc, is_backup, uplink_bw, downlink_bw, uplink_delay, downlink_delay = self.parse_link_characteristics(
                         self.parameters[k])
                 except ValueError as e:
                     logging.error("Ignored path {}: {}".format(k, e))
@@ -258,8 +277,11 @@ class TopoParameter(Parameter):
                     #         bw, loss_perc, backup=is_backup)
                     path = LinkCharacteristics(link_id, link_type, delay, queue_size,
                             bw, loss_perc, backup=is_backup,
-                            uplink_bw=uplink_bw, downlink_bw=downlink_bw)
+                            uplink_bw=uplink_bw, downlink_bw=downlink_bw,
+                            uplink_delay=uplink_delay, downlink_delay=downlink_delay)
                     self.link_characteristics.append(path)
+            
+                print(f"<====> buffer size of path {path.id}: {path.buffer_size()}")
 
     def __str__(self):
         s = "{}".format(super(TopoParameter, self).__str__())
@@ -305,18 +327,12 @@ class BottleneckLink(object):
         self.bs1 = self.topo.get_host(self.get_bs_name(1))
         self.bs2 = self.topo.get_host(self.get_bs_name(2))
         self.bs3 = self.topo.get_host(self.get_bs_name(3))
+        logging.info(f"bs0-3 values in reinit_variables(): {self.bs0}, {self.bs1}, {self.bs2}, {self.bs3}")
 
     def configure_bottleneck(self):
         bs1_interface_names = self.topo.get_interface_names(self.bs1)
         bs2_interface_names = self.topo.get_interface_names(self.bs2)
 
-        # Flow bs0 -> bs3 (uplink)
-        shaping_cmd = self.link_characteristics.build_bandwidth_cmd(bs1_interface_names[-1], direction='uplink')
-        self.topo.command_to(self.bs1, shaping_cmd)
-
-        # Flow bs3 -> bs0 (downlink)
-        shaping_cmd = self.link_characteristics.build_bandwidth_cmd(bs2_interface_names[0], direction='downlink')
-        self.topo.command_to(self.bs2, shaping_cmd)
         # Cleanup tc commands
         for bs1_ifname in bs1_interface_names:
             clean_cmd = self.link_characteristics.build_delete_tc_cmd(bs1_ifname)
@@ -328,23 +344,41 @@ class BottleneckLink(object):
             logging.info(clean_cmd)
             self.topo.command_to(self.bs2, clean_cmd)
 
-        # Flow bs0 -> bs3
-        netem_cmd = self.link_characteristics.build_netem_cmd(bs1_interface_names[-1],
-            "loss {}".format(self.link_characteristics.loss) if float(self.link_characteristics.loss) > 0 else "")
-        logging.info(netem_cmd)
-        self.topo.command_to(self.bs1, netem_cmd)
-        shaping_cmd = self.link_characteristics.build_bandwidth_cmd(bs2_interface_names[-1])
-        logging.info(shaping_cmd)
+        # Flow bs0 -> bs3 (uplink)
+        netem_cmd_uplink = self.link_characteristics.build_netem_cmd(
+            bs1_interface_names[-1], "loss {}".format(self.link_characteristics.loss), direction='uplink')
+        logging.info(f"bs1_interface_names[-1] intended for uplink: {bs1_interface_names[-1]}\n netem command: {netem_cmd_uplink}")
+        shaping_cmd = self.link_characteristics.build_bandwidth_cmd(bs2_interface_names[-1], direction='uplink')
+        self.topo.command_to(self.bs1, netem_cmd_uplink)
         self.topo.command_to(self.bs2, shaping_cmd)
+        
 
-        # Flow bs3 -> bs0
-        netem_cmd = self.link_characteristics.build_netem_cmd(bs2_interface_names[0],
-            "loss {}".format(self.link_characteristics.loss) if float(self.link_characteristics.loss) > 0 else "")
-        logging.info(netem_cmd)
-        self.topo.command_to(self.bs2, netem_cmd)
-        shaping_cmd = self.link_characteristics.build_bandwidth_cmd(bs1_interface_names[0])
-        logging.info(shaping_cmd)
+        # Flow bs3 -> bs0 (downlink)
+        netem_cmd_downlink = self.link_characteristics.build_netem_cmd(
+            bs2_interface_names[0], "loss {}".format(self.link_characteristics.loss), direction='downlink')
+        logging.info(f"bs2_interface_names[0] intended for downlink: {bs2_interface_names[0]}\n netem command: {netem_cmd_downlink}")
+        shaping_cmd = self.link_characteristics.build_bandwidth_cmd(bs1_interface_names[0], direction='downlink')
+        self.topo.command_to(self.bs2, netem_cmd_downlink)
         self.topo.command_to(self.bs1, shaping_cmd)
+        
+
+        # # Flow bs0 -> bs3
+        # netem_cmd = self.link_characteristics.build_netem_cmd(bs1_interface_names[-1],
+        #     "loss {}".format(self.link_characteristics.loss) if float(self.link_characteristics.loss) > 0 else "")
+        # logging.info(netem_cmd)
+        # self.topo.command_to(self.bs1, netem_cmd)
+        # shaping_cmd = self.link_characteristics.build_bandwidth_cmd(bs2_interface_names[-1])
+        # logging.info(shaping_cmd)
+        # self.topo.command_to(self.bs2, shaping_cmd)
+
+        # # Flow bs3 -> bs0
+        # netem_cmd = self.link_characteristics.build_netem_cmd(bs2_interface_names[0],
+        #     "loss {}".format(self.link_characteristics.loss) if float(self.link_characteristics.loss) > 0 else "")
+        # logging.info(netem_cmd)
+        # self.topo.command_to(self.bs2, netem_cmd)
+        # shaping_cmd = self.link_characteristics.build_bandwidth_cmd(bs1_interface_names[0])
+        # logging.info(shaping_cmd)
+        # self.topo.command_to(self.bs1, shaping_cmd)
 
     def configure_changing_bottleneck(self):
         bs1_interface_names = self.topo.get_interface_names(self.bs1)

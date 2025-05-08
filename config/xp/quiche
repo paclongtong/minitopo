@@ -4,7 +4,7 @@ clientFlags:--no-verify
 serverFlags:--disable-gso
 env:RUST_BACKTRACE=full RUST_LOG=trace
 
-quicheSize:1024000
+quicheSize:104857600
 serverCertPath:/home/paul/multipath-quiche/apps/src/bin/cert.crt
 serverKeyPath:/home/paul/multipath-quiche/apps/src/bin/cert.key
 serverRootDir:/home/paul/multipath-quiche/apps/src/bin/root
@@ -21,10 +21,10 @@ serverCcAlgorithm:cubic
 serverEnableEarlyData:true
 serverEnableRetry:false
 serverDisableGrease:false
-serverHttpVersion:HTTP/3
+serverHttpVersion:all
 initialMaxPathIdServer:2
 
-clientMethod:PUT
+clientMethod:GET
 clientMaxData:10000000
 clientMaxWindow:25165824
 clientMaxStreamData:1000000
