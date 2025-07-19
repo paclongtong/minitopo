@@ -12,3 +12,4 @@
 *.xpl
 *.patch
 __pycache__
+CLAUDE.md

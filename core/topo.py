@@ -62,6 +62,7 @@ class LinkCharacteristics(object):
         self.queuing_delay = str(self.extract_queuing_delay(queue_size, bandwidth, delay))
         self.netem_at = []
         self.backup = backup
+        print(f"queuing delay = {self.queuing_delay}")
 
     def bandwidth_delay_product_divided_by_mtu(self):
         """
@@ -346,38 +347,39 @@ class BottleneckLink(object):
 
         # Flow bs0 -> bs3 (uplink)
         netem_cmd_uplink = self.link_characteristics.build_netem_cmd(
-            bs1_interface_names[-1], "loss {}".format(self.link_characteristics.loss), direction='uplink')
-        logging.info(f"bs1_interface_names[-1] intended for uplink: {bs1_interface_names[-1]}\n netem command: {netem_cmd_uplink}")
-        shaping_cmd = self.link_characteristics.build_bandwidth_cmd(bs2_interface_names[-1], direction='uplink')
-        self.topo.command_to(self.bs1, netem_cmd_uplink)
-        self.topo.command_to(self.bs2, shaping_cmd)
-        
-
-        # Flow bs3 -> bs0 (downlink)
-        netem_cmd_downlink = self.link_characteristics.build_netem_cmd(
-            bs2_interface_names[0], "loss {}".format(self.link_characteristics.loss), direction='downlink')
-        logging.info(f"bs2_interface_names[0] intended for downlink: {bs2_interface_names[0]}\n netem command: {netem_cmd_downlink}")
-        shaping_cmd = self.link_characteristics.build_bandwidth_cmd(bs1_interface_names[0], direction='downlink')
-        self.topo.command_to(self.bs2, netem_cmd_downlink)
+            bs2_interface_names[-1], "loss {}".format(self.link_characteristics.loss), direction='uplink')
+        logging.info(f"bs2 egress uplink netem: {netem_cmd_uplink}")
+        shaping_cmd = self.link_characteristics.build_bandwidth_cmd(bs1_interface_names[-1], direction='uplink')
+        logging.info(f"bs1 egress uplink shaping: {shaping_cmd}")
+        self.topo.command_to(self.bs2, netem_cmd_uplink)
         self.topo.command_to(self.bs1, shaping_cmd)
         
+        # Flow bs3 -> bs0 (downlink)
+        netem_cmd_downlink = self.link_characteristics.build_netem_cmd(
+            bs1_interface_names[0], "loss {}".format(self.link_characteristics.loss), direction='downlink')
+        logging.info(f"bs1 egress downlink netem: {netem_cmd_downlink}")
+        shaping_cmd = self.link_characteristics.build_bandwidth_cmd(bs2_interface_names[0], direction='downlink')
+        logging.info(f"bs2 egress downlink shaping: {shaping_cmd}")
+        self.topo.command_to(self.bs1, netem_cmd_downlink)
+        self.topo.command_to(self.bs2, shaping_cmd)
 
-        # # Flow bs0 -> bs3
-        # netem_cmd = self.link_characteristics.build_netem_cmd(bs1_interface_names[-1],
-        #     "loss {}".format(self.link_characteristics.loss) if float(self.link_characteristics.loss) > 0 else "")
-        # logging.info(netem_cmd)
-        # self.topo.command_to(self.bs1, netem_cmd)
-        # shaping_cmd = self.link_characteristics.build_bandwidth_cmd(bs2_interface_names[-1])
-        # logging.info(shaping_cmd)
+
+        # # Flow bs0 -> bs3 (uplink)
+        # netem_cmd_uplink = self.link_characteristics.build_netem_cmd(
+        #     bs1_interface_names[-1], "loss {}".format(self.link_characteristics.loss), direction='uplink')
+        # logging.info(f"bs1 egress uplink netem: {netem_cmd_uplink}")
+        # shaping_cmd = self.link_characteristics.build_bandwidth_cmd(bs2_interface_names[-1], direction='uplink')
+        # logging.info(f"bs2 egress uplink shaping: {shaping_cmd}")
+        # self.topo.command_to(self.bs1, netem_cmd_uplink)
         # self.topo.command_to(self.bs2, shaping_cmd)
-
-        # # Flow bs3 -> bs0
-        # netem_cmd = self.link_characteristics.build_netem_cmd(bs2_interface_names[0],
-        #     "loss {}".format(self.link_characteristics.loss) if float(self.link_characteristics.loss) > 0 else "")
-        # logging.info(netem_cmd)
-        # self.topo.command_to(self.bs2, netem_cmd)
-        # shaping_cmd = self.link_characteristics.build_bandwidth_cmd(bs1_interface_names[0])
-        # logging.info(shaping_cmd)
+        
+        # # Flow bs3 -> bs0 (downlink)
+        # netem_cmd_downlink = self.link_characteristics.build_netem_cmd(
+        #     bs2_interface_names[0], "loss {}".format(self.link_characteristics.loss), direction='downlink')
+        # logging.info(f"bs1 egress downlink netem: {netem_cmd_downlink}")
+        # shaping_cmd = self.link_characteristics.build_bandwidth_cmd(bs1_interface_names[0], direction='downlink')
+        # logging.info(f"bs1 egress downlink shaping: {shaping_cmd}")
+        # self.topo.command_to(self.bs2, netem_cmd_downlink)
         # self.topo.command_to(self.bs1, shaping_cmd)
 
     def configure_changing_bottleneck(self):

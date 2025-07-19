@@ -2,7 +2,7 @@ leftSubnet:10.0.
 rightSubnet:10.1.
 topoType:MultiIf
 path_c2r_0:200,3334,100,0.0,100,100,200,200
-path_c2r_1:5,17,20,0.0,20,20,5,5
+path_c2r_1:20,67,20,0.0,20,20,20,20
 changeNetem:yes
 _netemAt_0:0,loss 0%
 _netemAt_1:0,loss 0%

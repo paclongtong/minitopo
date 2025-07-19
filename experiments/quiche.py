@@ -34,7 +34,8 @@ class QuicheParameter(RandomFileParameter):
     ENABLE_EARLY_DATA = "serverEnableEarlyData"
     ENABLE_RETRY = "serverEnableRetry"
     DISABLE_GREASE = "serverDisableGrease"
-    HTTP_VERSION = "serverHttpVersion"
+
+    HTTP_VERSION = "httpVersion"
 
     # Client-specific parameters
     METHOD = "clientMethod"
@@ -64,6 +65,7 @@ class QuicheParameter(RandomFileParameter):
     SESSION_FILE = "clientSessionFile"
     INITIAL_MAX_PATH_ID_SERVER = "initialMaxPathIdServer"
     INITIAL_MAX_PATH_ID_CLIENT = "initialMaxPathIdClient"
+    PUT = "put"
 
 
     def __init__(self, experiment_parameter_filename):
@@ -133,6 +135,8 @@ class Quiche(RandomFileExperiment):
     # CLIENT = "/home/paul/multipath-quiche/target/release/separate_stream_ack/quiche-client"
     # SERVER = "/home/paul/multipath-quiche/target/release/separate_stream_ack/quiche-server"
 
+    # CLIENT = "/home/paul/multipath-quiche/target/debug/separate-cca-logging/quiche-client"
+    # SERVER = "/home/paul/multipath-quiche/target/debug/separate-cca-logging/quiche-server"
     # CLIENT = "/home/paul/multipath-quiche/target/release/separate-two-streams/quiche-client"
     # SERVER = "/home/paul/multipath-quiche/target/release/separate-two-streams/quiche-server"
 
@@ -148,9 +152,15 @@ class Quiche(RandomFileExperiment):
     # CLIENT = "/home/paul/multipath-quiche/target/debug/test_server/quiche-client"
     # SERVER = "/home/paul/multipath-quiche/target/debug/test_server/quiche-server"
 
-    CLIENT = "/home/paul/multipath-quiche/target/debug/simplified_server/quiche-client"
-    SERVER = "/home/paul/multipath-quiche/target/debug/simplified_server/quiche-server"
+    CLIENT = "/home/paul/multipath-quiche/target/release/separate-cca-logging/quiche-client"
+    SERVER = "/home/paul/multipath-quiche/target/release/separate-cca-logging/quiche-server"
 
+    # CLIENT = "/home/paul/multipath-quiche/target/debug/simplified_server/quiche-client"
+    # SERVER = "/home/paul/multipath-quiche/target/debug/simplified_server/quiche-server"
+
+    # CLIENT = "/home/paul/multipath-quiche/target/debug/separate-untouched_server/quiche-client"
+    # SERVER = "/home/paul/multipath-quiche/target/debug/separate-untouched_server/quiche-server"
+    # 
     # CLIENT = "/home/paul/multipath-quiche/target/debug/original_two_method/quiche-client"
     # SERVER = "/home/paul/multipath-quiche/target/debug/original_two_method/quiche-server"
 
@@ -160,6 +170,9 @@ class Quiche(RandomFileExperiment):
 
     # CLIENT = "/home/paul/multipath-quiche/target/debug/server_stack_test/quiche-client"
     # SERVER = "/home/paul/multipath-quiche/target/debug/server_stack_test/quiche-server"
+
+    # CLIENT = "/home/paul/multipath-quiche/target/release/original-two-streams/quiche-client"
+    # SERVER = "/home/paul/multipath-quiche/target/release/original-two-streams/quiche-server"
 
     # CLIENT = "/home/paul/multipath-quiche/target/release/original/quiche-client"
     # SERVER = "/home/paul/multipath-quiche/target/release/original/quiche-server"
@@ -189,6 +202,7 @@ class Quiche(RandomFileExperiment):
         self.enable_early_data = self.experiment_parameter.get(QuicheParameter.ENABLE_EARLY_DATA)
         self.enable_retry = self.experiment_parameter.get(QuicheParameter.ENABLE_RETRY)
         self.disable_grease = self.experiment_parameter.get(QuicheParameter.DISABLE_GREASE)
+
         self.http_version = self.experiment_parameter.get(QuicheParameter.HTTP_VERSION)
 
         # Client parameters
@@ -221,6 +235,7 @@ class Quiche(RandomFileExperiment):
         self.size = self.experiment_parameter.get(QuicheParameter.SIZE)
         self.initial_max_path_id_server = self.experiment_parameter.get(QuicheParameter.INITIAL_MAX_PATH_ID_SERVER)
         self.initial_max_path_id_client = self.experiment_parameter.get(QuicheParameter.INITIAL_MAX_PATH_ID_CLIENT)
+        self.put = self.experiment_parameter.get(QuicheParameter.PUT)
         # self.addr_client = self.experiment_parameter.get(QuicheParameter.A)
         #
         if isinstance(self.size, list):
@@ -245,6 +260,7 @@ class Quiche(RandomFileExperiment):
         self.topo.command_to(self.topo_config.client, "rm {}".format(Quiche.CLIENT_LOG))
         self.topo.command_to(self.topo_config.server, "rm {}".format(Quiche.SERVER_LOG))
         self.topo.command_to(self.topo_config.server, "dd if=/dev/random of={}/{} bs=1024 count={}".format(self.root_dir, self.size, int(self.size) // 1024))
+        self.topo.command_to(self.topo_config.client, "dd if=/dev/random of={}/{} bs=1024 count={}".format(self.body, self.size+"_put", int(self.size) // 1024))
 
     def get_iperf_server_cmd(self):
         cmd = f"iperf3 -s -p 5201 &> {IPERF_SERVER_LOG} &"
@@ -292,6 +308,7 @@ class Quiche(RandomFileExperiment):
         initial_max_path_id_server = f"--initial-max-path-id {self.initial_max_path_id_server}" if self.initial_max_path_id_server else "30"
 
         # Construct the full command for starting the server
+        # QLOGDIR=/tmp/minitopo_experiences/ 
         cmd = f"QLOGDIR=/tmp/minitopo_experiences/ {self.env} {Quiche.SERVER} {certs} {listen} {root} {index} {server_name} " \
               f"{max_data} {max_window} {max_stream_data} {max_stream_window} " \
               f"{max_streams_bidi} {max_streams_uni} {idle_timeout} {cc_algorithm} {initial_max_path_id_server} " \
@@ -314,11 +331,11 @@ class Quiche(RandomFileExperiment):
 
         # Client-specific command options
         method_flag = f"--method {self.method}"
-        body_flag = f"--body {self.body}" if self.body else ""
+        body_flag = f"--body {self.body}/{self.size}_put" if self.put == 'true' else ""
         max_data = f"--max-data {self.max_data}"
-        max_window = f"--max-window {self.max_window}"
-        max_stream_data = f"--max-stream-data {self.max_stream_data}"
-        max_stream_window = f"--max-stream-window {self.max_stream_window}"
+        max_window = f"--max-window {self.max_window_client}"
+        max_stream_data = f"--max-stream-data {self.max_stream_data_client}"
+        max_stream_window = f"--max-stream-window {self.max_stream_window_client}"
         max_streams_bidi = f"--max-streams-bidi {self.max_streams_bidi}"
         max_streams_uni = f"--max-streams-uni {self.max_streams_uni}"
         idle_timeout = f"--idle-timeout {self.idle_timeout}"
@@ -340,7 +357,7 @@ class Quiche(RandomFileExperiment):
         session_file = f"--session-file {self.session_file}" if self.session_file else ""
         initial_max_path_id_client = f"--initial-max-path-id {self.initial_max_path_id_client}" if self.initial_max_path_id_client else "30"
         addr_client = f"-A 10.0.0.1:4433 -A 10.0.1.1:14434"  # Hardcoded 2-path
-
+        put = f"PUT:https://{self.topo_config.get_server_ip()}:4433/{self.size}_put" if self.put == 'true' else ''
         # Construct the full command for starting the client 
         # QLOGDIR=/tmp/minitopo_experiences/ 
         cmd = f"QLOGDIR=/tmp/minitopo_experiences/ {self.env} {Quiche.CLIENT} {method_flag} {body_flag} {max_data} {max_window} " \
@@ -348,7 +365,7 @@ class Quiche(RandomFileExperiment):
               f"{idle_timeout} {wire_version} {http_version} {dgram_proto} {dgram_count} {dgram_data} " \
               f"{dump_packets} {dump_responses} {dump_json} {max_json_payload} {connect_to} {trust_ca} {cc_algorithm} " \
               f"{max_active_cids} {perform_migration} {source_port} {session_file} {initial_max_path_id_client} {addr_client} {self.client_flags} "\
-              f"GET:https://{self.topo_config.get_server_ip()}:4433/{self.size} &> {Quiche.CLIENT_LOG} > /dev/null "
+              f"GET:https://{self.topo_config.get_server_ip()}:4433/{self.size} {put} &> {Quiche.CLIENT_LOG} > /dev/null "
                 # "PUT:https://{self.topo_config.get_server_ip()}:4433/{self.size}"\.
                 # " &> {Quiche.CLIENT_LOG} > /dev/null "
             #   f"--method GET https://{self.topo_config.get_server_ip()}:4433/{self.size}"
@@ -356,9 +373,322 @@ class Quiche(RandomFileExperiment):
         logging.info(f"Client command: {cmd}")
         return cmd
 
+    def run_post_experiment_analysis(self):
+        """
+        Enhanced automated post-experiment analysis with transfer time extraction,
+        metadata collection, and detailed file output
+        """
+        import datetime
+        import re
+        
+        logging.info("Starting enhanced post-experiment analysis...")
+        
+        # Extract implementation name from SERVER path
+        implementation_raw = None
+        if hasattr(self, 'SERVER') and self.SERVER:
+            # Extract from path like "/home/paul/multipath-quiche/target/release/separate-cca-logging/quiche-server"
+            import os
+            server_path = self.SERVER
+            path_parts = server_path.split('/')
+            # Find the part that comes before 'quiche-server'
+            for i, part in enumerate(path_parts):
+                if part == 'quiche-server' and i > 0:
+                    implementation_raw = path_parts[i-1]
+                    break
+        
+        # Apply implementation name conversions
+        implementation_mapping = {
+            'separate-cca-logging': 'separate_rigid',
+            'original-two-streams': 'original'
+        }
+        
+        implementation = implementation_mapping.get(implementation_raw, implementation_raw) if implementation_raw else 'unknown'
+        
+        logging.info(f"Detected implementation: {implementation_raw} -> {implementation}")
+        print(f"Using implementation: {implementation}")
+        
+        # Generate timestamp and transfer type for filename
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        transfer_type = "bidi" if self.put == 'true' else "uni"
+        
+        # We'll set the final results_filename after creating the directory
+        temp_results_filename = f"/tmp/minitopo_experiences/{timestamp}-{transfer_type}-{implementation}.txt"
+        
+        # Determine expected response count based on PUT parameter
+        expected_responses = "2/2" if self.put == 'true' else "1/1"
+        
+        # Check for expected responses in client log and extract transfer time
+        grep_cmd = f"grep '{expected_responses}' {Quiche.CLIENT_LOG}"
+        logging.info(f"Checking for {expected_responses} responses in client log...")
+        response_check = self.topo.command_to(self.topo_config.client, grep_cmd)
+        
+        transfer_time = None
+        if response_check:
+            logging.info(f"Found expected {expected_responses} responses")
+            print(f"\n{expected_responses} responses received successfully")
+            
+            # Extract transfer time from the response line
+            # Looking for pattern like "in 12.889255462s"
+            time_match = re.search(r'in\s+([\d.]+)s', response_check)
+            if time_match:
+                transfer_time = time_match.group(1)
+                print(f"Transfer time: {transfer_time}s")
+                logging.info(f"Extracted transfer time: {transfer_time}s")
+        else:
+            logging.warning(f"Expected {expected_responses} responses not found in client log")
+            print(f"\nWarning: {expected_responses} responses not found")
+        
+        # Find qlog files
+        logging.info("Finding qlog files...")
+        server_qlog_cmd = "ls -lth /tmp/minitopo_experiences/ | grep server- | head -n 1 | awk '{print $9}'"
+        client_qlog_cmd = "ls -lth /tmp/minitopo_experiences/ | grep client- | head -n 1 | awk '{print $9}'"
+        
+        server_qlog = self.topo.command_to(self.topo_config.client, server_qlog_cmd).strip()
+        client_qlog = self.topo.command_to(self.topo_config.client, client_qlog_cmd).strip()
+        
+        # Get experiment metadata
+        server_cmd = self.get_quiche_server_cmd()
+        client_cmd = self.get_quiche_client_cmd()
+        
+        # Read topology file content
+        topo_content = ""
+        try:
+            # Extract topology filename from topo_parameter if available
+            if hasattr(self.topo_parameter, 'parameter_filename'):
+                topo_file_path = self.topo_parameter.parameter_filename
+                topo_read_cmd = f"cat {topo_file_path}"
+                topo_content = self.topo.command_to(self.topo_config.client, topo_read_cmd)
+        except Exception as e:
+            logging.warning(f"Could not read topology file: {e}")
+            topo_content = "Topology content could not be retrieved"
+        
+        # Prepare results data
+        results_data = []
+        results_data.append("=" * 80)
+        results_data.append(f"QUICHE EXPERIMENT RESULTS - {timestamp}")
+        results_data.append(f"Transfer Type: {transfer_type.upper()}")
+        results_data.append(f"Implementation: {implementation}")
+        results_data.append("=" * 80)
+        results_data.append("")
+        
+        # Transfer summary
+        results_data.append("TRANSFER SUMMARY:")
+        results_data.append(f"Expected responses: {expected_responses}")
+        if transfer_time:
+            results_data.append(f"Transfer time: {transfer_time}s")
+        else:
+            results_data.append("Transfer time: Not available")
+        results_data.append("")
+        
+        # Response check details
+        results_data.append("RESPONSE CHECK:")
+        if response_check:
+            results_data.append(response_check.strip())
+        else:
+            results_data.append("No matching responses found")
+        results_data.append("")
+        
+        # Qlog files
+        results_data.append("QLOG FILES:")
+        results_data.append(f"Server qlog: {server_qlog if server_qlog else 'Not found'}")
+        results_data.append(f"Client qlog: {client_qlog if client_qlog else 'Not found'}")
+        results_data.append("")
+        
+        if server_qlog and client_qlog:
+            logging.info(f"Found server qlog: {server_qlog}")
+            logging.info(f"Found client qlog: {client_qlog}")
+            
+            # Extract loss statistics
+            logging.info("Extracting loss statistics...")
+            server_loss_cmd = f"grep 'lost=' {Quiche.SERVER_LOG} | tail -n 1"
+            client_loss_cmd = f"grep 'lost=' {Quiche.CLIENT_LOG} | tail -n 1"
+            
+            server_loss = self.topo.command_to(self.topo_config.server, server_loss_cmd)
+            client_loss = self.topo.command_to(self.topo_config.client, client_loss_cmd)
+            
+            # Add loss statistics to results
+            results_data.append("TRANSFER END STATISTICS:")
+            if server_loss:
+                results_data.append(f"Server: {server_loss.strip()}")
+                print(f"\nServer loss stats: {server_loss.strip()}")
+            if client_loss:
+                results_data.append(f"Client: {client_loss.strip()}")
+                print(f"Client loss stats: {client_loss.strip()}")
+            results_data.append("")
+            
+            # Create results directory
+            results_dir_name = f"{timestamp}-{transfer_type}-{implementation}"
+            results_dir_path = f"/home/paul/data_quiche/qlog/{results_dir_name}"
+            
+            # Create the directory in normal terminal environment
+            import subprocess
+            import os
+            os.makedirs(results_dir_path, exist_ok=True)
+            logging.info(f"Created results directory: {results_dir_path}")
+            
+            # Run qlog comparison script with implementation name and output to results directory
+            qlog_script_path = "/home/paul/data_quiche/logging-script/qlog_compare_pathwise.py"
+            server_qlog_full = f"/tmp/minitopo_experiences/{server_qlog}"
+            client_qlog_full = f"/tmp/minitopo_experiences/{client_qlog}"
+            
+            # Construct qlog command to run in normal terminal (not Mininet namespace)
+            # Try to find a Python interpreter that has pandas
+            import subprocess
+            python_candidates = ["python3", "python", "/usr/bin/python3", "/usr/bin/python"]
+            working_python = None
+            
+            for py_cmd in python_candidates:
+                try:
+                    result = subprocess.run([py_cmd, "-c", "import pandas"], capture_output=True, timeout=10)
+                    if result.returncode == 0:
+                        working_python = py_cmd
+                        logging.info(f"Found working Python with pandas: {py_cmd}")
+                        break
+                except:
+                    continue
+            
+            if not working_python:
+                working_python = "python3"  # fallback
+                logging.warning("Could not find Python with pandas, using python3 as fallback")
+            
+            qlog_cmd_args = [
+                working_python, qlog_script_path,
+                "--qlogs", f"{server_qlog_full},{implementation}",
+                f"{client_qlog_full},{implementation}",
+                "--paths", "0", "1",
+                "--output-suffix",f"{transfer_time}_{implementation}"
+            ]
+            
+            logging.info(f"Running qlog comparison in normal terminal: {' '.join(qlog_cmd_args)}")
+            print(f"\nRunning qlog comparison script in {results_dir_path}...")
+            
+            # Execute the qlog comparison script in normal terminal environment
+            import subprocess
+            try:
+                qlog_process = subprocess.run(
+                    qlog_cmd_args,
+                    cwd=results_dir_path,  # Change working directory to results_dir_path
+                    capture_output=True,
+                    text=True,
+                    timeout=300  # 5 minute timeout
+                )
+                
+                if qlog_process.returncode == 0:
+                    qlog_result = qlog_process.stdout
+                    if qlog_process.stderr:
+                        qlog_result += f"\nSTDERR:\n{qlog_process.stderr}"
+                else:
+                    qlog_result = f"Script failed with return code {qlog_process.returncode}\nSTDOUT:\n{qlog_process.stdout}\nSTDERR:\n{qlog_process.stderr}"
+                    
+            except subprocess.TimeoutExpired:
+                qlog_result = "Qlog comparison script timed out after 5 minutes"
+                logging.error("Qlog comparison script timed out")
+            except Exception as e:
+                qlog_result = f"Error running qlog comparison script: {str(e)}"
+                logging.error(f"Error running qlog comparison script: {e}")
+            if qlog_result:
+                results_data.append("QLOG COMPARISON OUTPUT:")
+                results_data.append(qlog_result.strip())
+                print(f"Qlog comparison output:\n{qlog_result}")
+            else:
+                results_data.append("QLOG COMPARISON: Failed or no output")
+                logging.warning("Qlog comparison script produced no output or failed")
+                print("Warning: Qlog comparison script execution failed or produced no output")
+                
+        else:
+            results_data.append("TRANSFER END STATISTICS: Could not retrieve (qlog files not found)")
+            results_data.append("QLOG COMPARISON: Skipped (qlog files not found)")
+            logging.error("Could not find qlog files")
+            print("\nError: Could not find qlog files for analysis")
+            
+            # Create results directory even if qlog files not found
+            results_dir_name = f"{timestamp}-{transfer_type}-{implementation}"
+            results_dir_path = f"/home/paul/data_quiche/qlog/{results_dir_name}"
+            import os
+            os.makedirs(results_dir_path, exist_ok=True)
+            logging.info(f"Created results directory: {results_dir_path}")
+        
+        results_data.append("")
+        results_data.append("=" * 80)
+        results_data.append("EXPERIMENT METADATA")
+        results_data.append("=" * 80)
+        results_data.append("")
+        
+        # Add experiment metadata
+        results_data.append("SERVER COMMAND:")
+        results_data.append(server_cmd)
+        results_data.append("")
+        
+        results_data.append("CLIENT COMMAND:")
+        results_data.append(client_cmd)
+        results_data.append("")
+        
+        results_data.append("TOPOLOGY CONFIGURATION:")
+        results_data.append(topo_content.strip() if topo_content else "Not available")
+        results_data.append("")
+        
+        results_data.append("EXPERIMENT PARAMETERS:")
+        results_data.append(f"Implementation: {implementation} (raw: {implementation_raw})")
+        results_data.append(f"File size: {self.size}")
+        results_data.append(f"PUT enabled: {self.put}")
+        results_data.append(f"Server CC algorithm: {self.cc_algorithm}")
+        results_data.append(f"Client CC algorithm: {self.cc_algorithm_client}")
+        results_data.append("")
+        
+        # Determine final file paths - always use the organized directory structure
+        results_dir_name = f"{timestamp}-{transfer_type}-{implementation}"
+        results_dir_path = f"/home/paul/data_quiche/qlog/{results_dir_name}"
+        final_results_filename = f"{results_dir_path}/{timestamp}-{transfer_type}-{implementation}.txt"
+        
+        # Write results to file in the organized directory using normal Python file operations
+        results_content = "\n".join(results_data)
+        
+        try:
+            with open(final_results_filename, 'w') as f:
+                f.write(results_content)
+            logging.info(f"Successfully wrote results to {final_results_filename}")
+        except Exception as e:
+            logging.error(f"Failed to write results file: {e}")
+            print(f"Error writing results file: {e}")
+        
+        # Also create a copy in the original location for backwards compatibility
+        try:
+            import shutil
+            shutil.copy2(final_results_filename, temp_results_filename)
+            logging.info(f"Created backup copy at {temp_results_filename}")
+        except Exception as e:
+            logging.warning(f"Failed to create backup copy: {e}")
+        
+        # Change ownership from root to paul for direct user access
+        try:
+            import subprocess
+            chown_cmd = ["chown", "-R", "paul:paul", results_dir_path]
+            subprocess.run(chown_cmd, check=True)
+            logging.info(f"Changed ownership of {results_dir_path} to paul:paul")
+            
+            # Also change ownership of the backup file
+            if os.path.exists(temp_results_filename):
+                chown_backup_cmd = ["chown", "paul:paul", temp_results_filename]
+                subprocess.run(chown_backup_cmd, check=True)
+                logging.info(f"Changed ownership of {temp_results_filename} to paul:paul")
+                
+        except subprocess.CalledProcessError as e:
+            logging.warning(f"Failed to change ownership: {e}")
+            print(f"Warning: Could not change file ownership to paul:paul")
+        except Exception as e:
+            logging.warning(f"Error changing ownership: {e}")
+
+        print(f"\nDetailed results saved to: {final_results_filename}")
+        print(f"Results directory: {results_dir_path}")
+        print(f"Files ownership changed to paul:paul for direct access")
+        logging.info(f"Results saved to: {final_results_filename}")
+        logging.info(f"Results directory created: {results_dir_path}")
+        logging.info("Enhanced post-experiment analysis completed")
+
     def clean(self):
         # super(Quiche, self).clean()
         self.topo.command_to(self.topo_config.server, "rm {}/{}".format(self.root_dir, self.size))
+        self.topo.command_to(self.topo_config.client, "rm {}/{}".format(self.body, self.size+'_put'))
         logging.info("Cleaning up experiment. Skipping sysctl restoration.")
 
     def run(self):
@@ -370,41 +700,68 @@ class Quiche(RandomFileExperiment):
 
         # self.topo.command_to(self.topo_config.client, "sleep 30")
         # self.topo.command_to(self.topo_config.server, "pkill iperf")
-        # self.topo.get_cli()
+        self.topo.get_cli()
         # time.sleep(12000)``
-        # server = 'Server_0'
-        # client = 'Client_0'
+        server = 'Server_0'
+        client = 'Client_0'
+
+        '''
         # Interfaces for path0 and path1
-        iface0 = 'Client_0-eth0@if229'
-        iface1 = 'Client_0-eth1@if230'
+        iface0 = 'Client_0-eth0'
+        iface1 = 'Client_0-eth1'
+        pcap_dir = '/tmp/minitopo_experiences'
         # PCAP files
         pcap0 = '/tmp/minitopo_experiences/quic-path0.pcap'
         pcap1 = '/tmp/minitopo_experiences/quic-path1.pcap'
 
-        # 1. Start tshark on path0
+        # Clean up any existing files
+        self.topo.command_to(self.topo_config.client, f'rm -f {pcap0} {pcap1}')
+        self.topo.command_to(self.topo_config.client, 'rm -f /tmp/tshark*.pid')
+
+        # Debug: Check if interfaces exist
+        print("Checking interfaces...")
+        self.topo.command_to(self.topo_config.client, f'ip link show {iface0}')
+        self.topo.command_to(self.topo_config.client, f'ip link show {iface1}')
+
+        # Debug: Check if tshark is available
+        print("Checking tshark availability...")
+        self.topo.command_to(self.topo_config.client, 'which tshark')
+
+        # 1. Start tshark on path0 (improved command)
         tshark_cmd0 = (
-            'sh -c '
-            f"\"tshark -i {iface0} -f 'udp port 4433' "
-            f"-w {pcap0} & echo $! > /tmp/tshark0.pid\""
+            f'tshark -i {iface0} -f "udp port 4433" '
+            f'-w {pcap0} '
+            f'> /tmp/tshark0.log 2>&1 & echo $! > /tmp/tshark0.pid'
         )
+        print(f"Starting tshark on {iface0}...")
         self.topo.command_to(self.topo_config.client, tshark_cmd0)
-
-        # 2. Start tshark on path1
+        
+        # 2. Start tshark on path1 (improved command)
         tshark_cmd1 = (
-            'sh -c '
-            f"\"tshark -i {iface1} -f 'udp port 4433' "
-            f"-w {pcap1} & echo $! > /tmp/tshark1.pid\""
+            f'tshark -i {iface1} -f "udp port 4433" '
+            f'-w {pcap1} '
+            f'> /tmp/tshark1.log 2>&1 & echo $! > /tmp/tshark1.pid'
         )
+        print(f"Starting tshark on {iface1}...")
         self.topo.command_to(self.topo_config.client, tshark_cmd1)
+        
+        # Give tshark time to start
+        time.sleep(2)
 
+        # Debug: Check if tshark processes are running
+        print("Checking tshark processes...")
+        self.topo.command_to(self.topo_config.client, 'ps aux | grep tshark')
 
+        # Debug: Check if PID files were created
+        self.topo.command_to(self.topo_config.client, 'ls -la /tmp/tshark*.pid')
+        '''
+        # Start the QUIC server
+        print("Starting QUIC server...")
 
         cmd = self.get_quiche_server_cmd()
         self.topo.command_to(self.topo_config.server, cmd)
 
         self.topo.command_to(self.topo_config.client, "sleep 2")
-
-
 
         cmd = self.get_quiche_client_cmd()
         # time.sleep(200)
@@ -412,39 +769,73 @@ class Quiche(RandomFileExperiment):
 
         self.topo.command_to(self.topo_config.client, "sleep 2")
 
-        # 6. Wait for the transfer to complete
-        time.sleep(5)
+        # Automated post-experiment analysis
+        self.run_post_experiment_analysis()
 
-        # 7. Stop tshark captures
-        self.topo.command_to(self.topo_config.client, 'kill $(cat /tmp/tshark0.pid)')
-        self.topo.command_to(self.topo_config.client, 'kill $(cat /tmp/tshark1.pid)')
+        '''
+        # Wait for the transfer to complete (adjust timing as needed)
+        print("Waiting for transfer to complete...")
+        time.sleep(10)  # Increased wait time
+        
+        # Debug: Check if PCAP files exist before stopping tshark
+        print("Checking PCAP files before stopping capture...")
+        self.topo.command_to(self.topo_config.client, f'ls -la {pcap_dir}/')
+        
+        # Stop tshark captures with better error handling
+        print("Stopping tshark captures...")
+        
+        # Check if PID files exist before trying to kill
+        pid_check0 = self.topo.command_to(self.topo_config.client, 'test -f /tmp/tshark0.pid && echo "exists" || echo "missing"')
+        pid_check1 = self.topo.command_to(self.topo_config.client, 'test -f /tmp/tshark1.pid && echo "exists" || echo "missing"')
+        
+        # Kill tshark processes
+        self.topo.command_to(self.topo_config.client, 'if [ -f /tmp/tshark0.pid ]; then kill $(cat /tmp/tshark0.pid) 2>/dev/null; fi')
+        self.topo.command_to(self.topo_config.client, 'if [ -f /tmp/tshark1.pid ]; then kill $(cat /tmp/tshark1.pid) 2>/dev/null; fi')
+        
+        # Alternative: kill all tshark processes
+        self.topo.command_to(self.topo_config.client, 'pkill -f tshark')
+        
+        # Give time for files to be written
+        time.sleep(2)
+        
+        # Final check of PCAP files
+        print("Final check of PCAP files...")
+        self.topo.command_to(self.topo_config.client, f'ls -la {pcap_dir}/')
+        self.topo.command_to(self.topo_config.client, f'file {pcap0} {pcap1}')
+        
+        # Check tshark logs for errors
+        print("Checking tshark logs...")
+        self.topo.command_to(self.topo_config.client, 'cat /tmp/tshark0.log')
+        self.topo.command_to(self.topo_config.client, 'cat /tmp/tshark1.log')
+        
+        print("PCAP capture completed!")
+        '''
+        # # 8. Count QUIC losses on each path inside client namespace
+        # loss0_output = self.topo.command_to(
+        #     self.topo_config.client,
+        #     f"tshark -r {pcap0} "
+        #     f"-Y \"ip.src==10.0.0.1 && quic.analysis.lost_packet\" "
+        #     "-q -z io,stat,0,COUNT(quic.analysis.lost_packet)"
+        # )
+        # loss1_output = self.topo.command_to(
+        #     self.topo_config.client,
+        #     f"tshark -r {pcap1} "
+        #     f"-Y \"ip.src==10.0.1.1 && quic.analysis.lost_packet\" "
+        #     "-q -z io,stat,0,COUNT(quic.analysis.lost_packet)"
+        # )
 
-        # 8. Count QUIC losses on each path inside client namespace
-        loss0_output = self.topo.command_to(
-            self.topo_config.client,
-            f"tshark -r {pcap0} "
-            f"-Y \"ip.src==10.0.0.1 && quic.analysis.lost_packet\" "
-            "-q -z io,stat,0,COUNT(quic.analysis.lost_packet)"
-        )
-        loss1_output = self.topo.command_to(
-            self.topo_config.client,
-            f"tshark -r {pcap1} "
-            f"-Y \"ip.src==10.0.1.1 && quic.analysis.lost_packet\" "
-            "-q -z io,stat,0,COUNT(quic.analysis.lost_packet)"
-        )
+        # # Helper to parse the numeric count
+        # def parse_count(output):
+        #     try:
+        #         return int(output.strip().split()[-1])
+        #     except Exception:
+        #         return 0
 
-        # Helper to parse the numeric count
-        def parse_count(output):
-            try:
-                return int(output.strip().split()[-1])
-            except Exception:
-                return 0
+        # loss0 = parse_count(loss0_output)
+        # loss1 = parse_count(loss1_output)
 
-        loss0 = parse_count(loss0_output)
-        loss1 = parse_count(loss1_output)
-
-        print(f"QUIC Path0 ({iface0}) losses: {loss0}")
-        print(f"QUIC Path1 ({iface1}) losses: {loss1}")
+        # print(f"QUIC Path0 ({iface0}) losses: {loss0}")
+        # print(f"QUIC Path1 ({iface1}) losses: {loss1}")
 
         
 

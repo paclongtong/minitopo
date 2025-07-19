@@ -1,34 +1,34 @@
 xpType:quiche
 mptcpEnabled:0
-clientFlags:--no-verify --disable-hystart
-serverFlags:--disable-gso --disable-hystart
+clientFlags:--no-verify
+serverFlags:--disable-gso
 env:RUST_BACKTRACE=full RUST_LOG=trace
 httpVersion:HTTP/3
-# --disable-hystart
+
 quicheSize:104857600
 serverCertPath:/home/paul/multipath-quiche/apps/src/bin/cert.crt
 serverKeyPath:/home/paul/multipath-quiche/apps/src/bin/cert.key
 serverRootDir:/home/paul/multipath-quiche/apps/src/bin/root
 serverIndexFile:index.html
 serverName:quic.tech
-serverMaxData:120000000
-serverMaxWindow:120000000
-serverMaxStreamData:120000000
-serverMaxStreamWindow:120000000
+serverMaxData:10000000
+serverMaxWindow:25165824
+serverMaxStreamData:1000000
+serverMaxStreamWindow:16700000
 serverMaxStreamsBidi:2
 serverMaxStreamsUni:2
 serverIdleTimeout:30000
-serverCcAlgorithm:cubic
+serverCcAlgorithm:bbr
 serverEnableEarlyData:true
 serverEnableRetry:false
 serverDisableGrease:false
 initialMaxPathIdServer:2
 
 clientMethod:GET
-clientMaxData:120000000
-clientMaxWindow:120000000
-clientMaxStreamData:120000000
-clientMaxStreamWindow:120000000
+clientMaxData:10000000
+clientMaxWindow:25165824
+clientMaxStreamData:1000000
+clientMaxStreamWindow:16700000
 clientMaxStreamsBidi:2
 clientMaxStreamsUni:2
 clientIdleTimeout:30000
@@ -38,11 +38,10 @@ clientDgramCount:0
 clientDgramData:quack
 clientDumpJson:false
 clientMaxJsonPayload:10000
-clientCcAlgorithm:cubic
+clientCcAlgorithm:bbr
 clientMaxActiveCIDs:50
 clientPerformMigration:false
 clientSourcePort:0
 clientInitialCwndPackets:10
 initialMaxPathIdClient:2
-clientBody:/tmp/minitopo_experiences
-put:false
+# /home/paul/multipath-quiche/apps/src/bin/body
