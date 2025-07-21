@@ -1,10 +1,11 @@
 xpType:quiche
 mptcpEnabled:0
-clientFlags:--no-verify --disable-hystart
-serverFlags:--disable-gso --disable-hystart
+clientFlags:--no-verify
+serverFlags:--disable-gso
 env:RUST_BACKTRACE=full RUST_LOG=trace
 httpVersion:HTTP/3
 # --disable-hystart
+# --disable-pacing
 quicheSize:104857600
 serverCertPath:/home/paul/multipath-quiche/apps/src/bin/cert.crt
 serverKeyPath:/home/paul/multipath-quiche/apps/src/bin/cert.key

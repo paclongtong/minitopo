@@ -454,10 +454,12 @@ class Quiche(RandomFileExperiment):
         topo_content = ""
         try:
             # Extract topology filename from topo_parameter if available
-            if hasattr(self.topo_parameter, 'parameter_filename'):
-                topo_file_path = self.topo_parameter.parameter_filename
-                topo_read_cmd = f"cat {topo_file_path}"
-                topo_content = self.topo.command_to(self.topo_config.client, topo_read_cmd)
+            # if hasattr(self.topo, 'topo_parameter') and hasattr(self.topo.topo_parameter, 'parameter_filename'):
+            #     topo_file_path = self.topo.topo_parameter.parameter_filename
+            #     # Read file directly from host filesystem
+            #     with open(topo_file_path, 'r') as f:
+            #         topo_content = f.read()
+            topo_content = self.topo.topo_parameter.format_parameters()
         except Exception as e:
             logging.warning(f"Could not read topology file: {e}")
             topo_content = "Topology content could not be retrieved"
@@ -494,7 +496,7 @@ class Quiche(RandomFileExperiment):
         results_data.append(f"Client qlog: {client_qlog if client_qlog else 'Not found'}")
         results_data.append("")
         
-        if server_qlog and client_qlog:
+        if transfer_time:
             logging.info(f"Found server qlog: {server_qlog}")
             logging.info(f"Found client qlog: {client_qlog}")
             
@@ -553,8 +555,8 @@ class Quiche(RandomFileExperiment):
             
             qlog_cmd_args = [
                 working_python, qlog_script_path,
-                "--qlogs", f"{server_qlog_full},{implementation}",
-                f"{client_qlog_full},{implementation}",
+                "--qlogs", f"{server_qlog_full},server-{implementation}",
+                f"{client_qlog_full},client-{implementation}",
                 "--paths", "0", "1",
                 "--output-suffix",f"{transfer_time}_{implementation}"
             ]
@@ -633,6 +635,8 @@ class Quiche(RandomFileExperiment):
         results_data.append(f"PUT enabled: {self.put}")
         results_data.append(f"Server CC algorithm: {self.cc_algorithm}")
         results_data.append(f"Client CC algorithm: {self.cc_algorithm_client}")
+        results_data.append(f"Client flags: {self.client_flags}")
+        results_data.append(f"Server flags: {self.server_flags}")
         results_data.append("")
         
         # Determine final file paths - always use the organized directory structure
@@ -700,10 +704,10 @@ class Quiche(RandomFileExperiment):
 
         # self.topo.command_to(self.topo_config.client, "sleep 30")
         # self.topo.command_to(self.topo_config.server, "pkill iperf")
-        self.topo.get_cli()
+        # self.topo.get_cli()
         # time.sleep(12000)``
-        server = 'Server_0'
-        client = 'Client_0'
+        # server = 'Server_0'
+        # client = 'Client_0'
 
         '''
         # Interfaces for path0 and path1

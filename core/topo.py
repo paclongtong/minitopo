@@ -284,6 +284,80 @@ class TopoParameter(Parameter):
             
                 print(f"<====> buffer size of path {path.id}: {path.buffer_size()}")
 
+    def format_parameters(self, title="Topology Parameters", include_links=True):
+        """
+        Format topology parameters in a nice readable way for files or display.
+        
+        Args:
+            title (str): Title for the formatted output
+            include_links (bool): Whether to include detailed link characteristics
+            
+        Returns:
+            str: Formatted topology parameters
+        """
+        lines = []
+        lines.append("=" * 60)
+        lines.append(f"{title.upper()}")
+        lines.append("=" * 60)
+        lines.append("")
+        
+        # Basic parameters
+        lines.append("BASIC CONFIGURATION:")
+        lines.append(f"  Left Subnet:      {self.get(self.LEFT_SUBNET)}")
+        lines.append(f"  Right Subnet:     {self.get(self.RIGHT_SUBNET)}")
+        try:
+            topo_type = self.get('topoType')
+        except:
+            topo_type = 'Not specified'
+        lines.append(f"  Topology Type:    {topo_type}")
+        lines.append(f"  Change Netem:     {self.get(self.CHANGE_NETEM)}")
+        lines.append("")
+        
+        # Link characteristics
+        if include_links and self.link_characteristics:
+            lines.append(f"LINK CHARACTERISTICS ({len(self.link_characteristics)} paths):")
+            lines.append("")
+            
+            for i, lc in enumerate(self.link_characteristics):
+                lines.append(f"  Path {i+1} (ID: {lc.id}, Type: {lc.link_type}):")
+                lines.append(f"    Base Delay:       {lc.delay} ms")
+                lines.append(f"    Queue Size:       {lc.queue_size} packets")
+                lines.append(f"    Base Bandwidth:   {lc.bandwidth} Mbps")
+                lines.append(f"    Loss:             {lc.loss}%")
+                lines.append(f"    Backup:           {'Yes' if lc.backup else 'No'}")
+                
+                # Show asymmetric values if different from base
+                if hasattr(lc, 'uplink_bw') and lc.uplink_bw and lc.uplink_bw != lc.bandwidth:
+                    lines.append(f"    Uplink BW:        {lc.uplink_bw} Mbps")
+                if hasattr(lc, 'downlink_bw') and lc.downlink_bw and lc.downlink_bw != lc.bandwidth:
+                    lines.append(f"    Downlink BW:      {lc.downlink_bw} Mbps")
+                if hasattr(lc, 'uplink_delay') and lc.uplink_delay and lc.uplink_delay != lc.delay:
+                    lines.append(f"    Uplink Delay:     {lc.uplink_delay} ms")
+                if hasattr(lc, 'downlink_delay') and lc.downlink_delay and lc.downlink_delay != lc.delay:
+                    lines.append(f"    Downlink Delay:   {lc.downlink_delay} ms")
+                
+                lines.append(f"    Queuing Delay:    {lc.queuing_delay} ms")
+                lines.append(f"    Buffer Size:      {lc.buffer_size():.0f} bytes")
+                
+                # Netem commands if present
+                if lc.netem_at:
+                    lines.append(f"    Netem Changes:    {len(lc.netem_at)} scheduled")
+                    for na in lc.netem_at:
+                        lines.append(f"      At {na.at}s: {na.cmd}")
+                
+                lines.append("")
+        
+        # Raw parameters section
+        lines.append("RAW CONFIGURATION:")
+        for key, value in sorted(self.parameters.items()):
+            if not key.startswith('_'):  # Skip internal parameters
+                lines.append(f"  {key}: {value}")
+        
+        lines.append("")
+        lines.append("=" * 60)
+        
+        return "\n".join(lines)
+
     def __str__(self):
         s = "{}".format(super(TopoParameter, self).__str__())
         s += "".join(["{}".format(lc) for lc in self.link_characteristics])
